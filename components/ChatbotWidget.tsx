@@ -1,8 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { BotIcon, SendIcon, XIcon, LinkIcon } from './icons';
 import { getChatResponse } from '../services/geminiService';
 import type { ChatMessage, SensorDataPoint } from '../types';
 import { MessageRole, BluetoothConnectionStatus } from '../types';
+import { useTranslations } from '../App';
 
 interface ChatbotWidgetProps {
   sensorData: SensorDataPoint[];
@@ -12,9 +14,11 @@ interface ChatbotWidgetProps {
 }
 
 const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({ sensorData, historicalData, bluetoothStatus, latestValue }) => {
+  const { t, language } = useTranslations();
+  
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: MessageRole.MODEL, text: "Hello! I'm your AI assistant, connected to this dashboard. I can see your device status and sensor data. How can I help?" },
+    { role: MessageRole.MODEL, text: t('initialBotMessage') },
   ]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -26,10 +30,34 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({ sensorData, historicalDat
   };
 
   useEffect(() => {
+    // Reset initial message when language changes and chat is closed
+    if (!isOpen) {
+        setMessages([{ role: MessageRole.MODEL, text: t('initialBotMessage') }]);
+    }
+  }, [t, isOpen]);
+
+
+  useEffect(() => {
     if (isOpen) {
       scrollToBottom();
     }
   }, [messages, isOpen]);
+  
+  const getStatusText = useCallback((status: BluetoothConnectionStatus) => {
+    switch (status) {
+        case BluetoothConnectionStatus.CONNECTED:
+            return t('connected');
+        case BluetoothConnectionStatus.CONNECTING:
+            return t('connectingStatus');
+        case BluetoothConnectionStatus.CONNECTED_AWAITING_SELECTION:
+            return t('selectCharacteristic');
+        case BluetoothConnectionStatus.ERROR:
+            return t('error');
+        case BluetoothConnectionStatus.DISCONNECTED:
+        default:
+            return t('disconnected');
+    }
+  }, [t]);
   
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,12 +70,12 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({ sensorData, historicalDat
 
     try {
       const contextSummary = `
-      - Bluetooth connection: ${bluetoothStatus}
+      - Bluetooth connection: ${getStatusText(bluetoothStatus)}
       - Latest sensor value: ${latestValue ?? 'N/A'}
       - Live data points shown (last 50): ${sensorData.length}
       - Total historical data points stored: ${historicalData.length}
       `;
-      const { text, sources } = await getChatResponse(newMessages, contextSummary);
+      const { text, sources } = await getChatResponse(newMessages, contextSummary, language);
       setMessages([...newMessages, { role: MessageRole.MODEL, text, sources }]);
     } catch (error) {
       console.error(error);
@@ -70,7 +98,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({ sensorData, historicalDat
       {isOpen && (
         <div className="fixed bottom-24 right-6 w-full max-w-sm h-[60vh] bg-secondary rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-highlight animate-fade-in-up">
           <header className="p-4 bg-highlight flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-text-primary">AI Assistant</h3>
+            <h3 className="text-lg font-semibold text-text-primary">{t('aiAssistant')}</h3>
           </header>
           <div className="flex-1 p-4 overflow-y-auto">
             <div className="space-y-4">
@@ -82,7 +110,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({ sensorData, historicalDat
                     {msg.sources && msg.sources.length > 0 && (
                       <div className="mt-2 pt-2 border-t border-highlight/50">
                         <h4 className="text-xs font-semibold text-text-secondary mb-1 flex items-center gap-1">
-                            <LinkIcon className="w-3 h-3"/> Sources:
+                            <LinkIcon className="w-3 h-3"/> {t('sources')}
                         </h4>
                         <ul className="space-y-1">
                           {msg.sources.map((source, i) => (
@@ -119,7 +147,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({ sensorData, historicalDat
                 type="text"
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
-                placeholder="Ask anything..."
+                placeholder={t('askAnything')}
                 className="flex-1 bg-transparent px-4 py-2 text-text-primary placeholder-text-secondary focus:outline-none"
                 disabled={isLoading}
               />

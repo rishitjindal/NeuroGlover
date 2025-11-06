@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { ChatMessage, MessageRole } from '../types';
 import type { GroundingSource } from '../types';
@@ -20,10 +21,13 @@ interface GeminiChatResponse {
 }
 
 // Manages chat history and gets a response from Gemini with search grounding.
-export const getChatResponse = async (history: ChatMessage[], appContext: string): Promise<GeminiChatResponse> => {
+export const getChatResponse = async (history: ChatMessage[], appContext: string, language: string): Promise<GeminiChatResponse> => {
   try {
+    const languageInstruction = `The user's current language is ${language}. Please respond in this language.`;
+    
     const systemInstruction = `You are a helpful AI assistant for a sensor data dashboard application.
 You can answer questions about the sensor data, the bluetooth connection status, and general queries.
+${languageInstruction}
 Use the following real-time application context to inform your answers. Do not mention that you were given this context unless asked.
 ---
 CONTEXT:

@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import type { SensorDataPoint } from '../types';
 import { BluetoothConnectionStatus } from '../types';
@@ -5,10 +6,45 @@ import BluetoothManager from './BluetoothManager';
 import SensorDataChart from './SensorDataChart';
 import ChatbotWidget from './ChatbotWidget';
 import HistoricalDataView from './HistoricalDataView';
+import { useTranslations } from '../App';
+import type { Language } from '../App';
+
+
+const LanguageSwitcher: React.FC = () => {
+  const { language, setLanguage, availableLanguages } = useTranslations();
+
+  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setLanguage(e.target.value as Language);
+  };
+
+  return (
+    <div className="relative">
+      <select
+        value={language}
+        onChange={handleLanguageChange}
+        className="appearance-none bg-secondary border border-highlight text-text-primary text-sm rounded-lg focus:ring-accent focus:border-accent block w-full pl-3 pr-8 py-2"
+        aria-label="Select language"
+      >
+        {availableLanguages.map((lang) => (
+          <option key={lang} value={lang}>
+            {lang.toUpperCase()}
+          </option>
+        ))}
+      </select>
+      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-text-secondary">
+        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+          <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+        </svg>
+      </div>
+    </div>
+  );
+};
+
 
 const Dashboard: React.FC = () => {
   const [sensorData, setSensorData] = useState<SensorDataPoint[]>([]);
   const [historicalData, setHistoricalData] = useState<SensorDataPoint[]>([]);
+  const { t } = useTranslations();
 
   // State lifted from BluetoothManager
   const [btStatus, setBtStatus] = useState<BluetoothConnectionStatus>(BluetoothConnectionStatus.DISCONNECTED);
@@ -69,15 +105,18 @@ const Dashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-primary p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
-        <header className="mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-text-primary">Sensor Dashboard</h1>
-          <p className="text-text-secondary mt-1">Real-time monitoring and AI-powered insights</p>
+        <header className="mb-8 flex flex-wrap justify-between items-start gap-4">
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-bold text-text-primary">{t('dashboardTitle')}</h1>
+            <p className="text-text-secondary mt-1">{t('dashboardSubtitle')}</p>
+          </div>
+          <LanguageSwitcher />
         </header>
 
         <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Row 1 */}
           <div className="lg:col-span-2 bg-secondary p-6 rounded-xl shadow-lg">
-            <h2 className="text-2xl font-semibold text-text-primary mb-4">Live Sensor Feed</h2>
+            <h2 className="text-2xl font-semibold text-text-primary mb-4">{t('liveSensorFeed')}</h2>
             <div className="h-96">
                 <SensorDataChart data={sensorData} />
             </div>

@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import type { SensorDataPoint } from '../types';
 import SensorDataChart from './SensorDataChart';
+import { useTranslations } from '../App';
 
 interface HistoricalDataViewProps {
   data: SensorDataPoint[];
@@ -9,6 +10,7 @@ interface HistoricalDataViewProps {
 }
 
 const HistoricalDataView: React.FC<HistoricalDataViewProps> = ({ data, onClear }) => {
+  const { t } = useTranslations();
   const today = new Date().toISOString().split('T')[0];
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
@@ -28,7 +30,7 @@ const HistoricalDataView: React.FC<HistoricalDataViewProps> = ({ data, onClear }
     const endTimestamp = end.getTime();
 
     if (startTimestamp > endTimestamp) {
-        setError("Start date cannot be after end date.");
+        setError(t('dateError'));
         return [];
     }
     setError(null);
@@ -36,10 +38,10 @@ const HistoricalDataView: React.FC<HistoricalDataViewProps> = ({ data, onClear }
     return data.filter(point => 
       point.timestamp >= startTimestamp && point.timestamp <= endTimestamp
     );
-  }, [data, startDate, endDate]);
+  }, [data, startDate, endDate, t]);
 
   const handleClearClick = () => {
-      if (window.confirm("Are you sure you want to delete all historical sensor data? This action cannot be undone.")) {
+      if (window.confirm(t('clearHistoryConfirm'))) {
           onClear();
       }
   }
@@ -47,10 +49,10 @@ const HistoricalDataView: React.FC<HistoricalDataViewProps> = ({ data, onClear }
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between mb-4 gap-4">
-        <h2 className="text-2xl font-semibold text-text-primary">Historical Data</h2>
+        <h2 className="text-2xl font-semibold text-text-primary">{t('historicalData')}</h2>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <div className="flex items-center gap-2">
-            <label htmlFor="start-date" className="text-sm text-text-secondary">From:</label>
+            <label htmlFor="start-date" className="text-sm text-text-secondary">{t('from')}</label>
             <input
               type="date"
               id="start-date"
@@ -60,7 +62,7 @@ const HistoricalDataView: React.FC<HistoricalDataViewProps> = ({ data, onClear }
             />
           </div>
           <div className="flex items-center gap-2">
-            <label htmlFor="end-date" className="text-sm text-text-secondary">To:</label>
+            <label htmlFor="end-date" className="text-sm text-text-secondary">{t('to')}</label>
             <input
               type="date"
               id="end-date"
@@ -74,7 +76,7 @@ const HistoricalDataView: React.FC<HistoricalDataViewProps> = ({ data, onClear }
             className="bg-red-600/80 hover:bg-red-700 disabled:bg-red-600/40 disabled:cursor-not-allowed text-white text-sm font-medium py-1.5 px-3 rounded-md transition-colors"
             disabled={data.length === 0}
             >
-            Clear History
+            {t('clearHistory')}
           </button>
         </div>
       </div>

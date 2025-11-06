@@ -2,16 +2,19 @@
 import React from 'react';
 import type { SensorDataPoint } from '../types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useTranslations } from '../App';
 
 interface SensorDataChartProps {
   data: SensorDataPoint[];
 }
 
 const SensorDataChart: React.FC<SensorDataChartProps> = ({ data }) => {
+    const { t } = useTranslations();
+    
     if (data.length === 0) {
         return (
             <div className="flex items-center justify-center h-full text-text-secondary">
-                <p>Waiting for data from a connected device...</p>
+                <p>{t('waitingForData')}</p>
             </div>
         );
     }
@@ -39,7 +42,7 @@ const SensorDataChart: React.FC<SensorDataChartProps> = ({ data }) => {
           labelStyle={{ color: '#A0A0C0' }}
         />
         <Legend wrapperStyle={{ color: '#E0E0FF' }} />
-        <Line type="monotone" dataKey="value" stroke="#3B82F6" strokeWidth={2} activeDot={{ r: 8 }} dot={false} name="Sensor Value" />
+        <Line type="monotone" dataKey="value" stroke="#3B82F6" strokeWidth={2} activeDot={{ r: 8 }} dot={false} name={t('sensorValue')} />
       </LineChart>
     </ResponsiveContainer>
   );

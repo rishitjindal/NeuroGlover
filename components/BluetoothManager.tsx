@@ -1,3 +1,4 @@
+
 // WORKAROUND: The build environment is missing Web Bluetooth API type definitions.
 // The following global declarations use `any` to resolve TypeScript compilation
 // errors without requiring changes to the project's dependencies.
@@ -13,6 +14,7 @@ declare global {
 import React, { useState, useCallback, useRef } from 'react';
 import { BluetoothConnectionStatus } from '../types';
 import { BluetoothIcon } from './icons';
+import { useTranslations } from '../App';
 
 interface BluetoothManagerProps {
   onNewData: (value: number) => void;
@@ -43,6 +45,7 @@ const BluetoothManager: React.FC<BluetoothManagerProps> = ({ onNewData, onStatus
   const [error, setError] = useState<string | null>(null);
   const characteristicRef = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
   const deviceRef = useRef<any | null>(null);
+  const { t } = useTranslations();
   
   const [discoveredServices, setDiscoveredServices] = useState<DiscoveredService[] | null>(null);
 
@@ -214,6 +217,22 @@ const BluetoothManager: React.FC<BluetoothManagerProps> = ({ onNewData, onStatus
       onStatusChange(BluetoothConnectionStatus.ERROR);
     }
   }, [onStatusChange]);
+  
+    const getStatusText = useCallback((status: BluetoothConnectionStatus) => {
+        switch (status) {
+            case BluetoothConnectionStatus.CONNECTED:
+                return t('connected');
+            case BluetoothConnectionStatus.CONNECTING:
+                return t('connectingStatus');
+            case BluetoothConnectionStatus.CONNECTED_AWAITING_SELECTION:
+                return t('selectCharacteristic');
+            case BluetoothConnectionStatus.ERROR:
+                return t('error');
+            case BluetoothConnectionStatus.DISCONNECTED:
+            default:
+                return t('disconnected');
+        }
+    }, [t]);
 
   const getStatusColor = () => {
     switch (status) {
@@ -233,8 +252,8 @@ const BluetoothManager: React.FC<BluetoothManagerProps> = ({ onNewData, onStatus
     if (status === BluetoothConnectionStatus.CONNECTED_AWAITING_SELECTION && discoveredServices) {
         return (
             <div className="flex-grow space-y-4 overflow-y-auto">
-                <h3 className="text-lg font-semibold text-text-primary">Select a Characteristic to Monitor</h3>
-                <p className="text-sm text-text-secondary">Choose a characteristic with the "NOTIFY" property to receive live data.</p>
+                <h3 className="text-lg font-semibold text-text-primary">{t('selectCharacteristicTitle')}</h3>
+                <p className="text-sm text-text-secondary">{t('selectCharacteristicDesc')}</p>
                 <div className="space-y-3 max-h-64 overflow-auto pr-2">
                     {discoveredServices.length === 0 && <p>No services found on this device.</p>}
                     {discoveredServices.map(service => (
@@ -265,20 +284,20 @@ const BluetoothManager: React.FC<BluetoothManagerProps> = ({ onNewData, onStatus
     return (
         <div className="flex-grow space-y-4">
             <div className="bg-primary p-4 rounded-lg">
-                <p className="text-sm text-text-secondary mb-1">Latest Sensor Reading</p>
+                <p className="text-sm text-text-secondary mb-1">{t('latestSensorReading')}</p>
                 <p className="text-4xl font-bold text-accent">
                     {latestValue !== null ? latestValue : '--'}
                 </p>
             </div>
             <div className="bg-primary p-4 rounded-lg space-y-2">
-                <h3 className="text-lg font-semibold text-text-primary">Last Used Configuration</h3>
+                <h3 className="text-lg font-semibold text-text-primary">{t('lastUsedConfig')}</h3>
                 <div className="space-y-3 pt-2">
                      <div>
-                        <label className="block text-xs font-medium text-text-secondary uppercase tracking-wider">Service UUID</label>
+                        <label className="block text-xs font-medium text-text-secondary uppercase tracking-wider">{t('serviceUuid')}</label>
                         <p className="text-sm text-text-primary font-mono truncate pt-1">{serviceUuid}</p>
                     </div>
                      <div>
-                        <label className="block text-xs font-medium text-text-secondary uppercase tracking-wider">Characteristic UUID</label>
+                        <label className="block text-xs font-medium text-text-secondary uppercase tracking-wider">{t('characteristicUuid')}</label>
                         <p className="text-sm text-text-primary font-mono truncate pt-1">{characteristicUuid}</p>
                     </div>
                 </div>
@@ -289,10 +308,10 @@ const BluetoothManager: React.FC<BluetoothManagerProps> = ({ onNewData, onStatus
 
   return (
     <div className="flex flex-col h-full">
-      <h2 className="text-2xl font-semibold text-text-primary mb-4">Device Control</h2>
+      <h2 className="text-2xl font-semibold text-text-primary mb-4">{t('deviceControl')}</h2>
       <div className="flex items-center space-x-3 mb-6">
         <BluetoothIcon className={`w-6 h-6 ${getStatusColor()}`} />
-        <span className={`font-medium ${getStatusColor()}`}>{status}</span>
+        <span className={`font-medium ${getStatusColor()}`}>{getStatusText(status)}</span>
       </div>
       
       {renderContent()}
@@ -302,11 +321,11 @@ const BluetoothManager: React.FC<BluetoothManagerProps> = ({ onNewData, onStatus
       <div className="mt-6">
         {status === BluetoothConnectionStatus.CONNECTED || status === BluetoothConnectionStatus.CONNECTED_AWAITING_SELECTION ? (
           <button onClick={disconnectDevice} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition-colors">
-            Disconnect
+            {t('disconnect')}
           </button>
         ) : (
           <button onClick={connectToDevice} disabled={status === BluetoothConnectionStatus.CONNECTING} className="w-full bg-accent hover:bg-blue-700 disabled:bg-highlight disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg transition-colors">
-            {status === BluetoothConnectionStatus.CONNECTING ? 'Connecting...' : 'Connect to Device'}
+            {status === BluetoothConnectionStatus.CONNECTING ? t('connecting') : t('connectToDevice')}
           </button>
         )}
       </div>
