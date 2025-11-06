@@ -1,0 +1,7 @@
+{
+  "name": "Copy of Bluetooth Sensor Dashboard",
+  "description": "A web application to connect to Bluetooth Low Energy (BLE) devices, visualize real-time sensor data, and interact with a Gemini-powered AI assistant for insights.",
+  "requestFramePermissions": [
+    "bluetooth"
+  ]
+}
