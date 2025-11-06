@@ -4,7 +4,6 @@ import type { SensorDataPoint } from '../types';
 import { BluetoothConnectionStatus } from '../types';
 import BluetoothManager from './BluetoothManager';
 import SensorDataChart from './SensorDataChart';
-import ChatbotWidget from './ChatbotWidget';
 import HistoricalDataView from './HistoricalDataView';
 import { useTranslations } from '../App';
 import type { Language } from '../App';
@@ -136,12 +135,6 @@ const Dashboard: React.FC = () => {
           </div>
         </main>
       </div>
-      <ChatbotWidget 
-        sensorData={sensorData}
-        historicalData={historicalData}
-        bluetoothStatus={btStatus}
-        latestValue={latestBtValue}
-      />
     </div>
   );
 };

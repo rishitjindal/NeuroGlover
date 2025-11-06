@@ -36,11 +36,6 @@ interface DiscoveredService {
 }
 
 
-// Default UUIDs for the Heart Rate service, used if nothing is in localStorage
-const DEFAULT_SERVICE_UUID = 'heart_rate';
-const DEFAULT_CHARACTERISTIC_UUID = 'heart_rate_measurement';
-
-
 const BluetoothManager: React.FC<BluetoothManagerProps> = ({ onNewData, onStatusChange, status, latestValue }) => {
   const [error, setError] = useState<string | null>(null);
   const characteristicRef = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
@@ -48,10 +43,6 @@ const BluetoothManager: React.FC<BluetoothManagerProps> = ({ onNewData, onStatus
   const { t } = useTranslations();
   
   const [discoveredServices, setDiscoveredServices] = useState<DiscoveredService[] | null>(null);
-
-  // State for UUID management
-  const [serviceUuid, setServiceUuid] = useState(() => localStorage.getItem('bt-service-uuid') || DEFAULT_SERVICE_UUID);
-  const [characteristicUuid, setCharacteristicUuid] = useState(() => localStorage.getItem('bt-characteristic-uuid') || DEFAULT_CHARACTERISTIC_UUID);
 
   const handleNotifications = useCallback((event: Event) => {
     const target = event.target as BluetoothRemoteGATTCharacteristic;
@@ -123,12 +114,6 @@ const BluetoothManager: React.FC<BluetoothManagerProps> = ({ onNewData, onStatus
         characteristicRef.current = characteristic;
         await characteristic.startNotifications();
         characteristic.addEventListener('characteristicvaluechanged', handleNotifications);
-
-        // Save selection for future sessions
-        setServiceUuid(selectedServiceUuid);
-        setCharacteristicUuid(selectedCharacteristicUuid);
-        localStorage.setItem('bt-service-uuid', selectedServiceUuid);
-        localStorage.setItem('bt-characteristic-uuid', selectedCharacteristicUuid);
         
         setDiscoveredServices(null); // Hide selection UI
         onStatusChange(BluetoothConnectionStatus.CONNECTED);
@@ -288,19 +273,6 @@ const BluetoothManager: React.FC<BluetoothManagerProps> = ({ onNewData, onStatus
                 <p className="text-4xl font-bold text-accent">
                     {latestValue !== null ? latestValue : '--'}
                 </p>
-            </div>
-            <div className="bg-primary p-4 rounded-lg space-y-2">
-                <h3 className="text-lg font-semibold text-text-primary">{t('lastUsedConfig')}</h3>
-                <div className="space-y-3 pt-2">
-                     <div>
-                        <label className="block text-xs font-medium text-text-secondary uppercase tracking-wider">{t('serviceUuid')}</label>
-                        <p className="text-sm text-text-primary font-mono truncate pt-1">{serviceUuid}</p>
-                    </div>
-                     <div>
-                        <label className="block text-xs font-medium text-text-secondary uppercase tracking-wider">{t('characteristicUuid')}</label>
-                        <p className="text-sm text-text-primary font-mono truncate pt-1">{characteristicUuid}</p>
-                    </div>
-                </div>
             </div>
         </div>
     );
