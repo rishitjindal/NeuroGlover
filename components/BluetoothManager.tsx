@@ -1,303 +1,174 @@
-
-// WORKAROUND: The build environment is missing Web Bluetooth API type definitions.
-// The following global declarations use `any` to resolve TypeScript compilation
-// errors without requiring changes to the project's dependencies.
+// WORKAROUND: The build environment is missing Web Serial API type definitions.
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  type BluetoothRemoteGATTCharacteristic = any;
   interface Navigator {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    bluetooth: any;
+    serial: any;
   }
 }
 
 import React, { useState, useCallback, useRef } from 'react';
-import { BluetoothConnectionStatus } from '../types';
-import { BluetoothIcon } from './icons';
+import { ConnectionStatus } from '../types';
+import { PlugIcon } from './icons';
 import { useTranslations } from '../App';
 
-interface BluetoothManagerProps {
+interface DeviceManagerProps {
   onNewData: (value: number) => void;
-  onStatusChange: (status: BluetoothConnectionStatus) => void;
-  status: BluetoothConnectionStatus;
+  onStatusChange: (status: ConnectionStatus) => void;
+  status: ConnectionStatus;
   latestValue: number | null;
 }
 
-interface DiscoveredService {
-    uuid: string;
-    characteristics: {
-        uuid: string;
-        properties: {
-            notify: boolean;
-            read: boolean;
-            write: boolean;
-        };
-    }[];
-}
-
-
-const BluetoothManager: React.FC<BluetoothManagerProps> = ({ onNewData, onStatusChange, status, latestValue }) => {
+const DeviceManager: React.FC<DeviceManagerProps> = ({ onNewData, onStatusChange, status, latestValue }) => {
   const [error, setError] = useState<string | null>(null);
-  const characteristicRef = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
-  const deviceRef = useRef<any | null>(null);
+  const portRef = useRef<any | null>(null);
+  const readerRef = useRef<any | null>(null);
+  const keepReadingRef = useRef(true);
   const { t } = useTranslations();
-  
-  const [discoveredServices, setDiscoveredServices] = useState<DiscoveredService[] | null>(null);
-
-  const handleNotifications = useCallback((event: Event) => {
-    const target = event.target as BluetoothRemoteGATTCharacteristic;
-    const value = target.value;
-    if (!value) return;
-
-    try {
-        // Attempt to parse known heart rate format first
-        const flags = value.getUint8(0);
-        const is16Bit = flags & 0x1;
-        let heartRate: number;
-        if (is16Bit) {
-            heartRate = value.getUint16(1, true); // Little Endian
-        } else {
-            heartRate = value.getUint8(1);
-        }
-        onNewData(heartRate);
-    } catch (parseError) {
-        // Fallback for other sensors: read the first byte
-        try {
-            console.log("Failed to parse as heart rate, using fallback parser.");
-            const fallbackValue = value.getUint8(0);
-            onNewData(fallbackValue);
-        } catch (fallbackError) {
-            console.error("Error parsing sensor data with any method:", parseError, fallbackError);
-            setError("Failed to parse sensor data. Check device compatibility.");
-            disconnectDevice();
-        }
-    }
-  }, [onNewData]);
 
   const disconnectDevice = useCallback(async () => {
-    const cleanup = () => {
-        onStatusChange(BluetoothConnectionStatus.DISCONNECTED);
-        characteristicRef.current = null;
-        deviceRef.current = null;
-        setDiscoveredServices(null);
+    keepReadingRef.current = false;
+    if (readerRef.current) {
+      try {
+        await readerRef.current.cancel();
+      } catch (err) {
+        console.warn("Error cancelling reader:", err);
+      }
     }
 
-    if (deviceRef.current && deviceRef.current.gatt?.connected) {
-        try {
-            if (characteristicRef.current) {
-                await characteristicRef.current.stopNotifications();
-                characteristicRef.current.removeEventListener('characteristicvaluechanged', handleNotifications);
-            }
-            deviceRef.current.gatt.disconnect();
-        } catch (err: any) {
-            console.error("Error disconnecting:", err);
-            setError(err.message);
-        } finally {
-            cleanup();
-        }
-    } else {
-        cleanup();
+    if (portRef.current) {
+      try {
+        await portRef.current.close();
+      } catch (err) {
+        console.error("Error closing port:", err);
+      }
     }
-  }, [onStatusChange, handleNotifications]);
-
-  const handleCharacteristicSelection = async (selectedServiceUuid: string, selectedCharacteristicUuid: string) => {
-    setError(null);
-    try {
-        if (!deviceRef.current || !deviceRef.current.gatt?.connected) {
-            throw new Error("Device is not connected.");
-        }
-
-        const server = deviceRef.current.gatt;
-        const service = await server.getPrimaryService(selectedServiceUuid);
-        const characteristic = await service.getCharacteristic(selectedCharacteristicUuid);
-
-        characteristicRef.current = characteristic;
-        await characteristic.startNotifications();
-        characteristic.addEventListener('characteristicvaluechanged', handleNotifications);
-        
-        setDiscoveredServices(null); // Hide selection UI
-        onStatusChange(BluetoothConnectionStatus.CONNECTED);
-
-    } catch (err: any) {
-        console.error("Error selecting characteristic:", err);
-        let userFriendlyError = `Error setting up notifications: ${err.message}`;
-        if (err.name === 'NotFoundError') {
-            userFriendlyError = "Could not find the selected service/characteristic on the device. It may have disconnected or does not support this configuration.";
-        } else if (err.name === 'NetworkError' || err.message.toLowerCase().includes('gatt server is disconnected')) {
-            userFriendlyError = "Device connection lost during setup. Please try reconnecting.";
-        } else if (err.name === 'SecurityError') {
-            userFriendlyError = "A security error occurred. This characteristic might require a more secure connection or pairing.";
-        }
-        setError(userFriendlyError);
-        onStatusChange(BluetoothConnectionStatus.ERROR);
-        disconnectDevice();
-    }
-  };
+    
+    portRef.current = null;
+    readerRef.current = null;
+    onStatusChange(ConnectionStatus.DISCONNECTED);
+  }, [onStatusChange]);
 
   const connectToDevice = useCallback(async () => {
     setError(null);
-    onStatusChange(BluetoothConnectionStatus.CONNECTING);
+    if (!navigator.serial) {
+      setError("Web Serial API is not available in this browser. Please use Chrome or Edge on desktop.");
+      onStatusChange(ConnectionStatus.ERROR);
+      return;
+    }
+
+    onStatusChange(ConnectionStatus.CONNECTING);
     try {
-      if (!navigator.bluetooth) {
-        throw new Error('Web Bluetooth API is not available in this browser.');
+      const port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 9600 });
+      portRef.current = port;
+      onStatusChange(ConnectionStatus.CONNECTED);
+      keepReadingRef.current = true;
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (port.readable && keepReadingRef.current) {
+        readerRef.current = port.readable.getReader();
+        try {
+          while (true) {
+            const { value, done } = await readerRef.current.read();
+            if (done) {
+              break;
+            }
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || ''; // Keep the last partial line in buffer
+            
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                if (trimmedLine) {
+                    const sensorValue = parseFloat(trimmedLine);
+                    if (!isNaN(sensorValue)) {
+                        onNewData(sensorValue);
+                    }
+                }
+            }
+          }
+        } catch (error) {
+          console.error("Read error:", error);
+          if (keepReadingRef.current) {
+            setError("Device disconnected or read error.");
+          }
+        } finally {
+          readerRef.current.releaseLock();
+        }
       }
-
-      const device = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-      });
-
-      deviceRef.current = device;
-
-      const handleDisconnect = () => {
-        onStatusChange(BluetoothConnectionStatus.DISCONNECTED);
-        characteristicRef.current = null;
-        deviceRef.current = null;
-        setDiscoveredServices(null);
-        device.removeEventListener('gattserverdisconnected', handleDisconnect);
-      };
-      device.addEventListener('gattserverdisconnected', handleDisconnect);
-
-      const server = await device.gatt?.connect();
-      const services = await server?.getPrimaryServices();
       
-      const discovered: DiscoveredService[] = [];
-      for (const service of services) {
-          const characteristics = await service.getCharacteristics();
-          discovered.push({
-              uuid: service.uuid,
-              characteristics: characteristics.map(c => ({
-                  uuid: c.uuid,
-                  properties: {
-                      notify: c.properties.notify,
-                      read: c.properties.read,
-                      write: c.properties.write,
-                  }
-              })),
-          });
+      if (keepReadingRef.current) {
+         await disconnectDevice();
       }
-      setDiscoveredServices(discovered);
-      onStatusChange(BluetoothConnectionStatus.CONNECTED_AWAITING_SELECTION);
 
     } catch (err: any) {
-      console.error("Bluetooth connection error:", err);
-
-      // User cancelled the device picker. This is not a critical error.
+      console.error("Serial connection error:", err);
       if (err.name === 'NotFoundError') {
-        onStatusChange(BluetoothConnectionStatus.DISCONNECTED);
-        return; // Silently return to previous state
+        setError("Device selection cancelled.");
+        onStatusChange(ConnectionStatus.DISCONNECTED);
+      } else {
+        setError(err.message);
+        onStatusChange(ConnectionStatus.ERROR);
       }
-      
-      let userFriendlyError = `An unexpected error occurred: ${err.message}.`;
-      if (err.name === 'NotAllowedError') {
-          userFriendlyError = "Bluetooth permissions denied. Please allow access in your browser settings and try again.";
-      } else if (err.message.includes('Web Bluetooth API is not available') || err.name === 'NotSupportedError') {
-          userFriendlyError = "Web Bluetooth is not available on this device/browser. Please try again on a compatible platform (like Chrome on Desktop/Android).";
-      } else if (err.message.toLowerCase().includes('adapter not available')) {
-          userFriendlyError = "Bluetooth adapter not available. Please make sure Bluetooth is turned on on your device.";
-      } else if (err.message.toLowerCase().includes('gatt server is disconnected')) {
-          userFriendlyError = "Connection failed. The device may be out of range or has disconnected.";
-      }
-      
-      setError(userFriendlyError);
-      onStatusChange(BluetoothConnectionStatus.ERROR);
     }
-  }, [onStatusChange]);
-  
-    const getStatusText = useCallback((status: BluetoothConnectionStatus) => {
-        switch (status) {
-            case BluetoothConnectionStatus.CONNECTED:
-                return t('connected');
-            case BluetoothConnectionStatus.CONNECTING:
-                return t('connectingStatus');
-            case BluetoothConnectionStatus.CONNECTED_AWAITING_SELECTION:
-                return t('selectCharacteristic');
-            case BluetoothConnectionStatus.ERROR:
-                return t('error');
-            case BluetoothConnectionStatus.DISCONNECTED:
-            default:
-                return t('disconnected');
-        }
-    }, [t]);
+  }, [onStatusChange, onNewData, disconnectDevice]);
+
+  const getStatusText = useCallback((status: ConnectionStatus) => {
+    switch (status) {
+      case ConnectionStatus.CONNECTED:
+        return t('connected');
+      case ConnectionStatus.CONNECTING:
+        return t('connectingStatus');
+      case ConnectionStatus.ERROR:
+        return t('error');
+      case ConnectionStatus.DISCONNECTED:
+      default:
+        return t('disconnected');
+    }
+  }, [t]);
 
   const getStatusColor = () => {
     switch (status) {
-      case BluetoothConnectionStatus.CONNECTED:
+      case ConnectionStatus.CONNECTED:
         return 'text-green-400';
-      case BluetoothConnectionStatus.CONNECTING:
-      case BluetoothConnectionStatus.CONNECTED_AWAITING_SELECTION:
+      case ConnectionStatus.CONNECTING:
         return 'text-yellow-400';
-      case BluetoothConnectionStatus.ERROR:
+      case ConnectionStatus.ERROR:
         return 'text-red-400';
       default:
         return 'text-text-secondary';
     }
   };
-  
-  const renderContent = () => {
-    if (status === BluetoothConnectionStatus.CONNECTED_AWAITING_SELECTION && discoveredServices) {
-        return (
-            <div className="flex-grow space-y-4 overflow-y-auto">
-                <h3 className="text-lg font-semibold text-text-primary">{t('selectCharacteristicTitle')}</h3>
-                <p className="text-sm text-text-secondary">{t('selectCharacteristicDesc')}</p>
-                <div className="space-y-3 max-h-64 overflow-auto pr-2">
-                    {discoveredServices.length === 0 && <p>No services found on this device.</p>}
-                    {discoveredServices.map(service => (
-                        <div key={service.uuid} className="bg-primary p-3 rounded-lg">
-                            <p className="text-xs text-text-secondary font-mono break-all">SERVICE: {service.uuid}</p>
-                            <div className="mt-2 space-y-1">
-                                {service.characteristics.map(char => (
-                                    <button
-                                        key={char.uuid}
-                                        onClick={() => handleCharacteristicSelection(service.uuid, char.uuid)}
-                                        disabled={!char.properties.notify}
-                                        className="w-full text-left p-2 rounded-md bg-secondary hover:bg-highlight disabled:bg-highlight/50 disabled:cursor-not-allowed transition-colors"
-                                    >
-                                        <p className="text-sm font-mono break-all text-text-primary">{char.uuid}</p>
-                                        <p className="text-xs text-text-secondary">
-                                            Properties: {char.properties.read ? 'R ' : ''}{char.properties.write ? 'W ' : ''}{char.properties.notify ? 'NOTIFY' : ''}
-                                        </p>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
-    }
-    
-    return (
-        <div className="flex-grow space-y-4">
-            <div className="bg-primary p-4 rounded-lg">
-                <p className="text-sm text-text-secondary mb-1">{t('latestSensorReading')}</p>
-                <p className="text-4xl font-bold text-accent">
-                    {latestValue !== null ? latestValue : '--'}
-                </p>
-            </div>
-        </div>
-    );
-  }
 
   return (
     <div className="flex flex-col h-full">
       <h2 className="text-2xl font-semibold text-text-primary mb-4">{t('deviceControl')}</h2>
       <div className="flex items-center space-x-3 mb-6">
-        <BluetoothIcon className={`w-6 h-6 ${getStatusColor()}`} />
+        <PlugIcon className={`w-6 h-6 ${getStatusColor()}`} />
         <span className={`font-medium ${getStatusColor()}`}>{getStatusText(status)}</span>
       </div>
       
-      {renderContent()}
+      <div className="flex-grow space-y-4">
+        <div className="bg-primary p-4 rounded-lg">
+          <p className="text-sm text-text-secondary mb-1">{t('latestSensorReading')}</p>
+          <p className="text-4xl font-bold text-accent">
+            {latestValue !== null ? latestValue.toFixed(2) : '--'}
+          </p>
+        </div>
+      </div>
 
       {error && <p className="text-red-400 text-sm mt-4 text-center">{error}</p>}
 
       <div className="mt-6">
-        {status === BluetoothConnectionStatus.CONNECTED || status === BluetoothConnectionStatus.CONNECTED_AWAITING_SELECTION ? (
+        {status === ConnectionStatus.CONNECTED ? (
           <button onClick={disconnectDevice} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition-colors">
             {t('disconnect')}
           </button>
         ) : (
-          <button onClick={connectToDevice} disabled={status === BluetoothConnectionStatus.CONNECTING} className="w-full bg-accent hover:bg-blue-700 disabled:bg-highlight disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg transition-colors">
-            {status === BluetoothConnectionStatus.CONNECTING ? t('connecting') : t('connectToDevice')}
+          <button onClick={connectToDevice} disabled={status === ConnectionStatus.CONNECTING} className="w-full bg-accent hover:bg-blue-700 disabled:bg-highlight disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg transition-colors">
+            {status === ConnectionStatus.CONNECTING ? t('connecting') : t('connectToDevice')}
           </button>
         )}
       </div>
@@ -305,4 +176,4 @@ const BluetoothManager: React.FC<BluetoothManagerProps> = ({ onNewData, onStatus
   );
 };
 
-export default BluetoothManager;
+export default DeviceManager;

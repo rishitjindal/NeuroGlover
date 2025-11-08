@@ -1,8 +1,8 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import type { SensorDataPoint } from '../types';
-import { BluetoothConnectionStatus } from '../types';
-import BluetoothManager from './BluetoothManager';
+import { ConnectionStatus } from '../types';
+import DeviceManager from './BluetoothManager';
 import SensorDataChart from './SensorDataChart';
 import HistoricalDataView from './HistoricalDataView';
 import { useTranslations } from '../App';
@@ -45,8 +45,8 @@ const Dashboard: React.FC = () => {
   const [historicalData, setHistoricalData] = useState<SensorDataPoint[]>([]);
   const { t } = useTranslations();
 
-  // State lifted from BluetoothManager
-  const [btStatus, setBtStatus] = useState<BluetoothConnectionStatus>(BluetoothConnectionStatus.DISCONNECTED);
+  // State lifted from DeviceManager
+  const [btStatus, setBtStatus] = useState<ConnectionStatus>(ConnectionStatus.DISCONNECTED);
   const [latestBtValue, setLatestBtValue] = useState<number | null>(null);
 
   // Load historical data on component mount
@@ -89,9 +89,9 @@ const Dashboard: React.FC = () => {
 
   }, []);
   
-  const handleStatusChange = useCallback((newStatus: BluetoothConnectionStatus) => {
+  const handleStatusChange = useCallback((newStatus: ConnectionStatus) => {
     setBtStatus(newStatus);
-    if (newStatus === BluetoothConnectionStatus.DISCONNECTED || newStatus === BluetoothConnectionStatus.ERROR) {
+    if (newStatus === ConnectionStatus.DISCONNECTED || newStatus === ConnectionStatus.ERROR) {
       setLatestBtValue(null);
     }
   }, []);
@@ -121,7 +121,7 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
           <div className="bg-secondary p-6 rounded-xl shadow-lg">
-            <BluetoothManager 
+            <DeviceManager 
               onNewData={handleNewData}
               onStatusChange={handleStatusChange}
               status={btStatus}

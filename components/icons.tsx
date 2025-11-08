@@ -1,7 +1,7 @@
 
 import React from 'react';
 
-export const BluetoothIcon: React.FC<{ className?: string }> = ({ className }) => (
+export const PlugIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width="24"
@@ -14,6 +14,11 @@ export const BluetoothIcon: React.FC<{ className?: string }> = ({ className }) =
     strokeLinejoin="round"
     className={className}
   >
-    <path d="m7 7 10 10-5 5V2l5 5L7 17" />
+    <path d="M12 22v-5" />
+    <path d="M9 8V2" />
+    <path d="M15 8V2" />
+    <path d="M18 8h-2a4 4 0 0 0-4 4v1" />
+    <path d="M6 8h2a4 4 0 0 1 4 4v1" />
+    <path d="M8 17h8" />
   </svg>
 );

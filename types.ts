@@ -5,10 +5,9 @@ export interface SensorDataPoint {
   value: number;
 }
 
-export enum BluetoothConnectionStatus {
+export enum ConnectionStatus {
   DISCONNECTED = "Disconnected",
   CONNECTING = "Connecting",
   CONNECTED = "Connected",
-  CONNECTED_AWAITING_SELECTION = "Select Characteristic",
   ERROR = "Error",
 }

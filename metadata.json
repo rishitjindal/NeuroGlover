@@ -1,7 +1,7 @@
 {
-  "name": "Copy of Bluetooth Sensor Dashboard",
-  "description": "A web application to connect to Bluetooth Low Energy (BLE) devices and visualize real-time sensor data.",
+  "name": "Serial Sensor Dashboard",
+  "description": "A web application to connect to Serial Port Profile (SPP) devices like Arduino or HC-05 and visualize real-time sensor data.",
   "requestFramePermissions": [
-    "bluetooth"
+    "serial"
   ]
 }
